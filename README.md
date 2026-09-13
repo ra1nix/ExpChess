@@ -15,3 +15,4 @@ using python for the logic, principals and explanations & HTML for the visuals.
 -option to highlight the piece's legal moves
 -adding more chess concepts
 -fixing the promotion
+-improving the engine positional understanding
