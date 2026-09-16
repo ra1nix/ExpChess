@@ -3,14 +3,27 @@ import chess
 from engine.evaluation import evaluate_board
 
 
+def order_moves(board, moves):
+    capturing_moves = []
+    other_moves = []
+    for move in moves:
+        if board.is_capture(move):
+            capturing_moves.append(move)
+        else:
+            other_moves.append(move)
+    return capturing_moves + other_moves
+
+
 def minimax(board, depth, alpha, beta, maximizing):
     if depth == 0 or board.is_game_over():
         result = evaluate_board(board)
         return result["total"]
 
+    ordered_moves = order_moves(board, list(board.legal_moves))
+
     if maximizing:
         best_value = -9999.0
-        for move in board.legal_moves:
+        for move in ordered_moves:
             board.push(move)
             value = minimax(board, depth - 1, alpha, beta, False)
             board.pop()
@@ -24,7 +37,7 @@ def minimax(board, depth, alpha, beta, maximizing):
         return best_value
     else:
         best_value = 9999.0
-        for move in board.legal_moves:
+        for move in ordered_moves:
             board.push(move)
             value = minimax(board, depth - 1, alpha, beta, True)
             board.pop()
@@ -42,7 +55,9 @@ def get_best_move_with_analysis(board, depth=2):
     is_white_turn = (board.turn == chess.WHITE)
     candidate_list = []
 
-    for move in board.legal_moves:
+    ordered_moves = order_moves(board, list(board.legal_moves))
+
+    for move in ordered_moves:
         board.push(move)
         score = minimax(board, depth - 1, -9999.0, 9999.0, not is_white_turn)
         board.pop()

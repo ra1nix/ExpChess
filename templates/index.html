@@ -39,9 +39,15 @@
         }
 
         #board { width: 400px; height: 400px; display: grid; grid-template-columns: repeat(8, 1fr); border: 2px solid #444; border-radius: 4px; overflow: hidden; direction: ltr; }
+        .board-middle { display: flex; }
+        .rank-labels { display: flex; flex-direction: column; }
+        .rank-labels div { width: 16px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; }
+        .file-labels { display: flex; }
+        .file-labels div { width: 50px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; }
         .square { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 34px; cursor: pointer; user-select: none; }
         .white-sq { background: #f0d9b5; color: #000; }
         .black-sq { background: #b58863; color: #000; }
+        .highlight { background: #7fc97f !important; }
         .selected { background: #f5f682 !important; }
 
         .bot-header { display: flex; align-items: center; justify-content: space-between; }
@@ -69,6 +75,23 @@
         button.btn-undo { background: #6c757d; border: none; font-weight: bold; }
         button.btn-undo:hover { background: #5a6268; }
 
+        .highlight-toggle {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1px solid #444;
+            background: #333;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .highlight-toggle.active {
+            background: #007bff;
+            border-color: #007bff;
+        }
+
         .history-box {
             background: #1e1e1e;
             border: 1px solid #333;
@@ -88,6 +111,7 @@
         <div class="bot-container">
             <div class="bot-header">
                 <strong style="color: #007bff;">🤖 شرح المحرك:</strong>
+                <div class="highlight-toggle" id="highlightToggle" title="إظهار/إخفاء الحركات الممكنة" onclick="toggleHighlights()">💡</div>
             </div>
             <div class="speech-bubble" id="botBubble">جاري التحميل...</div>
         </div>
@@ -98,7 +122,13 @@
                 <div class="eval-bar-fill" id="evalFill"></div>
             </div>
 
-            <div id="board"></div>
+            <div>
+                <div class="board-middle">
+                    <div id="board"></div>
+                    <div class="rank-labels" id="rankLabels"></div>
+                </div>
+                <div class="file-labels" id="fileLabels"></div>
+            </div>
         </div>
     </div>
 
@@ -137,6 +167,19 @@
 
         let selectedSquare = null;
         let currentPlayerColor = 'white';
+        let highlightsEnabled = false;
+        let gameOver = false;
+        let isThinking = false;
+
+        function toggleHighlights() {
+            highlightsEnabled = !highlightsEnabled;
+            const btn = document.getElementById('highlightToggle');
+            if (highlightsEnabled) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        }
 
         async function updateBoard() {
             const res = await fetch('/api/state');
@@ -181,12 +224,72 @@
                     boardEl.appendChild(sq);
                 }
             }
+
+            renderLabels();
+        }
+
+        function renderLabels() {
+            const files = currentPlayerColor === 'white' ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+            const ranks = currentPlayerColor === 'white' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
+
+            const rankEl = document.getElementById('rankLabels');
+            rankEl.innerHTML = '';
+            ranks.forEach(r => {
+                const div = document.createElement('div');
+                div.innerText = r;
+                rankEl.appendChild(div);
+            });
+
+            const fileEl = document.getElementById('fileLabels');
+            fileEl.innerHTML = '';
+            files.forEach(f => {
+                const div = document.createElement('div');
+                div.innerText = f;
+                fileEl.appendChild(div);
+            });
         }
 
         function updateUI(data) {
             document.getElementById('botBubble').innerText = data.explanation;
-            updateEvalBar(data.eval);
+
+            if (data.game_status === 'checkmate') {
+                gameOver = true;
+                updateEvalBarMate(data.winner);
+            } else if (data.game_status === 'draw') {
+                gameOver = true;
+                updateEvalBarDraw();
+            } else {
+                gameOver = false;
+                updateEvalBar(data.eval);
+            }
+
             renderHistory(data.san_history);
+        }
+
+        function updateEvalBarMate(winner) {
+            const fillEl = document.getElementById('evalFill');
+            const textEl = document.getElementById('evalText');
+
+            if (winner === 'white') {
+                fillEl.style.height = '100%';
+                fillEl.style.backgroundColor = '#ffffff';
+                textEl.style.bottom = '8px'; textEl.style.top = 'auto'; textEl.style.color = '#1e1e1e';
+            } else {
+                fillEl.style.height = '0%';
+                fillEl.style.backgroundColor = '#1e1e1e';
+                textEl.style.top = '8px'; textEl.style.bottom = 'auto'; textEl.style.color = '#ffffff';
+            }
+            textEl.innerText = 'M0';
+        }
+
+        function updateEvalBarDraw() {
+            const fillEl = document.getElementById('evalFill');
+            const textEl = document.getElementById('evalText');
+
+            fillEl.style.height = '50%';
+            fillEl.style.backgroundColor = '#e2e2e2';
+            textEl.style.top = 'auto'; textEl.style.bottom = '8px'; textEl.style.color = '#1e1e1e';
+            textEl.innerText = '0.0';
         }
 
         function updateEvalBar(score) {
@@ -196,6 +299,7 @@
             const fillEl = document.getElementById('evalFill');
             const textEl = document.getElementById('evalText');
 
+            fillEl.style.backgroundColor = '#e2e2e2';
             fillEl.style.height = `${percentage}%`;
             textEl.innerText = score > 0 ? `+${score.toFixed(1)}` : score.toFixed(1);
 
@@ -223,19 +327,40 @@
         }
 
         async function handleSquareClick(sqName) {
+            if (gameOver || isThinking) {
+                return;
+            }
+
             if (!selectedSquare) {
                 selectedSquare = sqName;
                 document.querySelector(`[data-square="${sqName}"]`)?.classList.add('selected');
+
+                if (highlightsEnabled) {
+                    const res = await fetch('/api/legal_moves', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({square: sqName})
+                    });
+                    const data = await res.json();
+                    data.legal_moves.forEach(target => {
+                        document.querySelector(`[data-square="${target}"]`)?.classList.add('highlight');
+                    });
+                }
             } else {
                 const move = selectedSquare + sqName;
                 selectedSquare = null;
-                document.querySelectorAll('.square').forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll('.square').forEach(el => el.classList.remove('selected', 'highlight'));
+
+                isThinking = true;
+                document.getElementById('botBubble').innerText = 'المحرك يفكر...';
 
                 const res = await fetch('/api/move', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({move: move})
                 });
+
+                isThinking = false;
 
                 const data = await res.json();
                 if (data.status === 'success' || data.status === 'game_over') {

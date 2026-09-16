@@ -1,6 +1,6 @@
+
 import chess
 
-# Note: pin detection, discovered-attack detection ,even tempo and various concepts might be implemented in the future
 def detect_tactics(board, move):
     motifs = []
 

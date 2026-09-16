@@ -7,6 +7,17 @@ from explanation.generator import generate_explanation
 app = Flask(__name__)
 
 
+def get_game_status(board):
+    if board.is_checkmate():
+        winner = "black" if board.turn == chess.WHITE else "white"
+        return "checkmate", winner
+
+    if board.is_stalemate() or board.is_insufficient_material() or board.can_claim_fifty_moves() or board.is_repetition(3):
+        return "draw", None
+
+    return "ongoing", None
+
+
 class GameState:
     def __init__(self):
         self.reset(player_color="white")
@@ -15,7 +26,7 @@ class GameState:
         self.board = chess.Board()
         self.player_color = player_color
         self.bot_color = "black" if player_color == "white" else "white"
-        self.last_explanation = "أهلاً ! اختر لونك ثم ابدأ اللعب."
+        self.last_explanation = "أهلاً بك! اختر لونك ثم ابدأ اللعب."
         self.last_eval = 0.0
 
         if self.player_color == "black":
@@ -33,14 +44,25 @@ class GameState:
         if self.board.is_game_over():
             return None
 
-        analysis = get_best_move_with_analysis(self.board, depth=2)
+        analysis = get_best_move_with_analysis(self.board, depth=3)
         bot_move = analysis["best_move"]
 
         explanation_text = generate_explanation(self.board, analysis)
-        self.last_explanation = explanation_text
         self.last_eval = analysis["best_score"]
 
         self.board.push(bot_move)
+
+        status, winner = get_game_status(self.board)
+        if status == "checkmate":
+            self.last_eval = 999.0 if winner == "white" else -999.0
+            winner_arabic = "الأبيض" if winner == "white" else "الأسود"
+            self.last_explanation = f"كش مات! الفوز لـ{winner_arabic}."
+        elif status == "draw":
+            self.last_eval = 0.0
+            self.last_explanation = "تعادل - لا توجد نقلات قانونية متاحة."
+        else:
+            self.last_explanation = explanation_text
+
         return bot_move.uci()
 
 
@@ -72,14 +94,25 @@ def index():
 
 @app.route('/api/state', methods=['GET'])
 def get_state():
+    status, winner = get_game_status(game.board)
     eval_breakdown = evaluate_board(game.board)
+
+    if status == "checkmate":
+        eval_value = 999.0 if winner == "white" else -999.0
+    elif status == "draw":
+        eval_value = 0.0
+    else:
+        eval_value = eval_breakdown["total"] if game.player_color == "white" else game.last_eval
+
     return jsonify({
         "fen": game.board.fen(),
         "is_game_over": game.board.is_game_over(),
+        "game_status": status,
+        "winner": winner,
         "turn": "white" if game.board.turn == chess.WHITE else "black",
         "player_color": game.player_color,
         "explanation": game.last_explanation,
-        "eval": eval_breakdown["total"] if game.player_color == "white" else game.last_eval,
+        "eval": eval_value,
         "san_history": game.get_san_history()
     })
 
@@ -117,17 +150,17 @@ def make_move():
 
     game.board.push(user_move)
 
-    if game.board.is_game_over():
-        eval_breakdown = evaluate_board(game.board)
-        return jsonify({
-            "status": "game_over",
-            "fen": game.board.fen(),
-            "eval": eval_breakdown["total"],
-            "explanation": "انتهت اللعبة!",
-            "san_history": game.get_san_history()
-        })
-
-    game.make_bot_move()
+    status, winner = get_game_status(game.board)
+    if status == "checkmate":
+        game.last_eval = 999.0 if winner == "white" else -999.0
+        winner_arabic = "الأبيض" if winner == "white" else "الأسود"
+        game.last_explanation = f"كش مات! الفوز لـ{winner_arabic}."
+    elif status == "draw":
+        game.last_eval = 0.0
+        game.last_explanation = "تعادل - لا توجد نقلات قانونية متاحة."
+    else:
+        game.make_bot_move()
+        status, winner = get_game_status(game.board)
 
     return jsonify({
         "status": "success",
@@ -135,7 +168,9 @@ def make_move():
         "explanation": game.last_explanation,
         "eval": game.last_eval,
         "san_history": game.get_san_history(),
-        "is_game_over": game.board.is_game_over()
+        "is_game_over": game.board.is_game_over(),
+        "game_status": status,
+        "winner": winner
     })
 
 
@@ -159,13 +194,16 @@ def undo_move():
     eval_breakdown = evaluate_board(game.board)
     game.last_eval = eval_breakdown["total"]
     game.last_explanation = "تم التراجع عن الحركة الأخيرة."
+    status, winner = get_game_status(game.board)
 
     return jsonify({
         "status": "success",
         "fen": game.board.fen(),
         "explanation": game.last_explanation,
         "eval": game.last_eval,
-        "san_history": game.get_san_history()
+        "san_history": game.get_san_history(),
+        "game_status": status,
+        "winner": winner
     })
 
 
@@ -175,13 +213,16 @@ def reset():
     player_color = data.get("player_color", "white")
     game.reset(player_color=player_color)
     eval_breakdown = evaluate_board(game.board)
+    status, winner = get_game_status(game.board)
     return jsonify({
         "status": "reset",
         "fen": game.board.fen(),
         "explanation": game.last_explanation,
         "eval": game.last_eval,
         "san_history": game.get_san_history(),
-        "player_color": game.player_color
+        "player_color": game.player_color,
+        "game_status": status,
+        "winner": winner
     })
 
 
