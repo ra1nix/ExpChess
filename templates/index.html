@@ -39,10 +39,10 @@
         }
 
         #board { width: 400px; height: 400px; display: grid; grid-template-columns: repeat(8, 1fr); border: 2px solid #444; border-radius: 4px; overflow: hidden; direction: ltr; }
-        .board-middle { display: flex; }
-        .rank-labels { display: flex; flex-direction: column; }
+        .board-middle { display: flex; direction: ltr; }
+        .rank-labels { display: flex; flex-direction: column; direction: ltr; }
         .rank-labels div { width: 16px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; }
-        .file-labels { display: flex; }
+        .file-labels { display: flex; direction: ltr; }
         .file-labels div { width: 50px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; }
         .square { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 34px; cursor: pointer; user-select: none; }
         .white-sq { background: #f0d9b5; color: #000; }
@@ -92,6 +92,30 @@
             border-color: #007bff;
         }
 
+        .board-outer { position: relative; }
+        .promotion-modal {
+            display: none;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #2a2a2a;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 15px;
+            gap: 10px;
+            z-index: 20;
+        }
+        .promotion-modal.active { display: flex; }
+        .promotion-modal button {
+            font-size: 32px;
+            width: 55px; height: 55px;
+            background: #f0d9b5;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .promotion-modal button:hover { background: #7fc97f; }
+
         .history-box {
             background: #1e1e1e;
             border: 1px solid #333;
@@ -122,12 +146,19 @@
                 <div class="eval-bar-fill" id="evalFill"></div>
             </div>
 
-            <div>
+            <div class="board-outer">
                 <div class="board-middle">
                     <div id="board"></div>
                     <div class="rank-labels" id="rankLabels"></div>
                 </div>
                 <div class="file-labels" id="fileLabels"></div>
+
+                <div class="promotion-modal" id="promotionModal">
+                    <button data-piece="q">♛</button>
+                    <button data-piece="r">♜</button>
+                    <button data-piece="b">♝</button>
+                    <button data-piece="n">♞</button>
+                </div>
             </div>
         </div>
     </div>
@@ -170,6 +201,7 @@
         let highlightsEnabled = false;
         let gameOver = false;
         let isThinking = false;
+        let currentMatrix = null;
 
         function toggleHighlights() {
             highlightsEnabled = !highlightsEnabled;
@@ -206,6 +238,7 @@
             const boardEl = document.getElementById('board');
             boardEl.innerHTML = '';
             const matrix = fenToMatrix(fen);
+            currentMatrix = matrix;
 
             const rowOrder = currentPlayerColor === 'white' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
             const colOrder = currentPlayerColor === 'white' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
@@ -229,7 +262,7 @@
         }
 
         function renderLabels() {
-            const files = currentPlayerColor === 'white' ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+            const files = currentPlayerColor === 'white' ? ['a','b','c','d','e','f','g','h'] : ['h','g','f','e','d','c','b','a'];
             const ranks = currentPlayerColor === 'white' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
 
             const rankEl = document.getElementById('rankLabels');
@@ -326,6 +359,19 @@
             box.scrollTop = box.scrollHeight;
         }
 
+        function askPromotionChoice() {
+            return new Promise(resolve => {
+                const modal = document.getElementById('promotionModal');
+                modal.classList.add('active');
+                modal.querySelectorAll('button').forEach(btn => {
+                    btn.onclick = () => {
+                        modal.classList.remove('active');
+                        resolve(btn.dataset.piece);
+                    };
+                });
+            });
+        }
+
         async function handleSquareClick(sqName) {
             if (gameOver || isThinking) {
                 return;
@@ -347,7 +393,20 @@
                     });
                 }
             } else {
-                const move = selectedSquare + sqName;
+                let move = selectedSquare + sqName;
+
+                const fromFile = selectedSquare.charCodeAt(0) - 97;
+                const fromRank = parseInt(selectedSquare.slice(1), 10);
+                const fromRow = 8 - fromRank;
+                const movingPiece = currentMatrix ? currentMatrix[fromRow][fromFile] : '';
+                const targetRank = parseInt(sqName.slice(1), 10);
+                const isPromotion = (movingPiece === 'P' && targetRank === 8) || (movingPiece === 'p' && targetRank === 1);
+
+                if (isPromotion) {
+                    const choice = await askPromotionChoice();
+                    move = move + choice;
+                }
+
                 selectedSquare = null;
                 document.querySelectorAll('.square').forEach(el => el.classList.remove('selected', 'highlight'));
 

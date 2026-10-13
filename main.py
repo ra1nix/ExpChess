@@ -18,6 +18,37 @@ def get_game_status(board):
     return "ongoing", None
 
 
+def get_eval_display_cap(board):
+    ply_count = len(board.move_stack)
+    pair_number = (ply_count // 2) + 1
+
+    if pair_number <= 3:
+        return 0.5
+    elif pair_number <= 6:
+        return 1.0
+    elif pair_number <= 9:
+        return 1.5
+    elif pair_number <= 12:
+        return 2.0
+    elif pair_number <= 15:
+        return 2.5
+    elif pair_number <= 18:
+        return 3.0
+    else:
+        return None
+
+
+def apply_eval_cap(board, value):
+    cap = get_eval_display_cap(board)
+    if cap is None:
+        return value
+    if value > cap:
+        return cap
+    if value < -cap:
+        return -cap
+    return value
+
+
 class GameState:
     def __init__(self):
         self.reset(player_color="white")
@@ -54,13 +85,14 @@ class GameState:
 
         status, winner = get_game_status(self.board)
         if status == "checkmate":
-            self.last_eval = 999.0 if winner == "white" else -999.0
+            self.last_eval = 9999.0 if winner == "white" else -9999.0
             winner_arabic = "الأبيض" if winner == "white" else "الأسود"
             self.last_explanation = f"كش مات! الفوز لـ{winner_arabic}."
         elif status == "draw":
             self.last_eval = 0.0
             self.last_explanation = "تعادل - لا توجد نقلات قانونية متاحة."
         else:
+            self.last_eval = apply_eval_cap(self.board, self.last_eval)
             self.last_explanation = explanation_text
 
         return bot_move.uci()
@@ -98,11 +130,12 @@ def get_state():
     eval_breakdown = evaluate_board(game.board)
 
     if status == "checkmate":
-        eval_value = 999.0 if winner == "white" else -999.0
+        eval_value = 9999.0 if winner == "white" else -9999.0
     elif status == "draw":
         eval_value = 0.0
     else:
         eval_value = eval_breakdown["total"] if game.player_color == "white" else game.last_eval
+        eval_value = apply_eval_cap(game.board, eval_value)
 
     return jsonify({
         "fen": game.board.fen(),
@@ -152,7 +185,7 @@ def make_move():
 
     status, winner = get_game_status(game.board)
     if status == "checkmate":
-        game.last_eval = 999.0 if winner == "white" else -999.0
+        game.last_eval = 9999.0 if winner == "white" else -9999.0
         winner_arabic = "الأبيض" if winner == "white" else "الأسود"
         game.last_explanation = f"كش مات! الفوز لـ{winner_arabic}."
     elif status == "draw":
@@ -192,7 +225,7 @@ def undo_move():
         game.board.pop()
 
     eval_breakdown = evaluate_board(game.board)
-    game.last_eval = eval_breakdown["total"]
+    game.last_eval = apply_eval_cap(game.board, eval_breakdown["total"])
     game.last_explanation = "تم التراجع عن الحركة الأخيرة."
     status, winner = get_game_status(game.board)
 

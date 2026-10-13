@@ -15,6 +15,12 @@ def order_moves(board, moves):
 
 
 def minimax(board, depth, alpha, beta, maximizing):
+    if board.is_checkmate():
+        return -9999.0 if board.turn == chess.WHITE else 9999.0
+
+    if board.is_stalemate():
+        return 0.0
+
     if depth == 0 or board.is_game_over():
         result = evaluate_board(board)
         return result["total"]

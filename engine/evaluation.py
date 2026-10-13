@@ -13,7 +13,6 @@ CENTER_SQUARES = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 
 def is_pawn_isolated(board, square, color):
-    # No friendly pawn on either neighboring file = isolated
     file_index = chess.square_file(square)
     for neighbor_file in [file_index - 1, file_index + 1]:
         if neighbor_file < 0 or neighbor_file > 7:
@@ -27,7 +26,6 @@ def is_pawn_isolated(board, square, color):
 
 
 def is_pawn_doubled(board, square, color):
-    # Two or more friendly pawns sharing the same file = doubled
     file_index = chess.square_file(square)
     pawn_count_on_file = 0
     for rank_index in range(8):
@@ -111,10 +109,6 @@ def evaluate_king_safety(board):
 
 
 def evaluate_king_attack(board):
-    # Rewards heavy attacking pieces (rook, queen) for being close to
-    # the ENEMY king's file or rank - this is the basic idea behind
-    # building a checkmate attack: line up your strongest pieces near
-    # the opponent's king instead of leaving them far away.
     score = 0.0
     for color in [chess.WHITE, chess.BLACK]:
         enemy_king_square = board.king(not color)
@@ -144,9 +138,6 @@ def evaluate_king_attack(board):
 
 
 def evaluate_open_files(board):
-    # Rewards a rook standing on a file with no pawn of its own color
-    # on it - an "open" or "semi-open" file, where the rook can move
-    # and attack freely instead of being blocked by its own pawns.
     score = 0.0
     for square, piece in board.piece_map().items():
         if piece.piece_type != chess.ROOK:
@@ -175,8 +166,6 @@ LONG_DIAGONAL_SQUARES = [
 
 
 def evaluate_bishop_diagonals(board):
-    # Rewards a bishop standing on one of the two long diagonals,
-    # where it can see and control the most squares on the board.
     score = 0.0
     for square, piece in board.piece_map().items():
         if piece.piece_type != chess.BISHOP:

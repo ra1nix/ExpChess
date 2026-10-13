@@ -41,19 +41,21 @@ def generate_explanation(board, search_result):
     reasons = []
 
     if "FORK" in tactics_found:
-        reasons.append("(Fork) تهاجم بها قطعتين مهمتين في آن واحد، ما يجبر الخصم على خسارة إحداهما")
+        reasons.append("تخلق شوكة (Fork) تهاجم بها قطعتين مهمتين في آن واحد، ما يجبر الخصم على خسارة إحداهما")
+    if "TEMPO" in tactics_found:
+        reasons.append("تهاجم قطعة أعلى قيمة من قطعتي وهي في مكان آمن، فتجبر الخصم على التراجع بها وأكسب زمناً (Tempo)")
     if "CHECK" in tactics_found:
-        reasons.append("تضع ملك الخصم في كش مباشر، فتجبره على الرد الفوري وتمنحني دورا (Tempo)")
+        reasons.append("تضع ملك الخصم في كش مباشر، فتجبره على الرد الفوري وتمنحني المبادرة")
 
     measurable_reasons = []
     if material_change > 0.05:
-        measurable_reasons.append(("تكسب تفوق قطع واضحا، وهو عامل تزداد قيمته كلما اقتربت اللعبة من نهايتها", material_change))
+        measurable_reasons.append(("تكسب تفوقاً مادياً واضحاً، وهو عامل يزداد وزنه كلما اقتربت اللعبة من نهايتها", material_change))
     if king_safety_change > 0.05:
-        measurable_reasons.append(("تُضعف الغطاء الدفاعي حول ملك الخصم، وتفتح خطوطا نحوه", king_safety_change))
+        measurable_reasons.append(("تُضعف الغطاء الدفاعي حول ملك الخصم، وتفتح خطوطاً نحو مربعه", king_safety_change))
     if center_change > 0.05:
         measurable_reasons.append(("تعزز سيطرتي على مربعات الوسط الحيوية، نقطة الانطلاق الرئيسية لأي هجوم", center_change))
     if mobility_change > 0.05:
-        measurable_reasons.append(("تزيد من حرية حركة قطعي، وتحوّلها من قطع خاملة إلى قطع اكثر فاعلية", mobility_change))
+        measurable_reasons.append(("تزيد من حرية حركة قطعي، وتحوّلها من قطع دفاعية إلى قطع فاعلة", mobility_change))
     if king_attack_change > 0.05:
         measurable_reasons.append(("تقرّب قطعي الثقيلة (الرخ/الوزير) من ملك الخصم استعداداً لهجوم حاسم", king_attack_change))
     if open_file_change > 0.05:
@@ -80,7 +82,5 @@ def generate_explanation(board, search_result):
             text = text + " فكّرت أيضاً في " + alt_san + "، لكنها أضعف بفارق واضح في ميزان القوى."
         else:
             text = text + " كانت " + alt_san + " بديلاً قريباً من حيث القوة، لكن " + move_san + " ترجّحت بفارق طفيف."
-
-    text = text + " (تقييم الرقعة الآن: " + format(best_score, "+g") + ")"
 
     return text
